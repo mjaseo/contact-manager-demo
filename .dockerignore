@@ -1,0 +1,10 @@
+/node_modules
+/vendor
+/storage/logs
+/storage/framework/sessions
+/storage/framework/views
+/.git
+/.github
+/.env
+Dockerfile
+README.md
