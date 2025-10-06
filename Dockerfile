@@ -1,50 +1,43 @@
-# Stage 1: Build assets with Node
-FROM node:20-bullseye AS frontend
-
+# Stage 1: Build Frontend
+FROM node:20 AS frontend
 WORKDIR /app
+
+# Copy all frontend-related files
 COPY package*.json vite.config.* ./
 COPY resources ./resources
-RUN npm install && npm run build
+COPY public ./public
+
+RUN npm install
+RUN npm run build
 
 
-# Stage 2: Set up PHP + Composer + Apache
-FROM php:8.3-apache AS backend
+# Stage 2: PHP Application
+FROM php:8.3-fpm
 
-# Install system dependencies
+# Install system deps
 RUN apt-get update && apt-get install -y \
-    git zip unzip libpng-dev libonig-dev libxml2-dev curl \
-    && docker-php-ext-install pdo pdo_mysql mbstring exif pcntl bcmath gd
-
-# Enable Apache mod_rewrite
-RUN a2enmod rewrite
+    git curl libpng-dev libjpeg-dev libfreetype6-dev libonig-dev libzip-dev unzip zip \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install pdo pdo_mysql mbstring zip exif pcntl gd bcmath
 
 # Set working directory
 WORKDIR /var/www/html
 
-# Copy Composer
-COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
-
-# Copy backend code
+# Copy Laravel files
 COPY . .
 
-# Copy built frontend assets from previous stage
-COPY --from=frontend /app/public ./public
+# Copy frontend build output
+COPY --from=frontend /app/public/build ./public/build
 
 # Install PHP dependencies
+RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 RUN composer install --no-dev --optimize-autoloader
 
-# Fix permissions for storage & bootstrap
-RUN chown -R www-data:www-data storage bootstrap/cache
+# Set permissions
+RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
 
-# Expose port 80
-EXPOSE 80
+# Expose port
+EXPOSE 8000
 
-# Set environment variables for production
-ENV APACHE_DOCUMENT_ROOT=/var/www/html/public
-ENV APP_ENV=production
-ENV APP_DEBUG=false
-
-# Adjust Apache config to use Laravel public folder
-RUN sed -ri -e 's!/var/www/html!/var/www/html/public!g' /etc/apache2/sites-available/000-default.conf
-
-CMD ["apache2-foreground"]
+# Run Laravel server
+CMD php artisan serve --host=0.0.0.0 --port=8000
