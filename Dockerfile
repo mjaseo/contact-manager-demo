@@ -2,13 +2,16 @@
 FROM node:20 AS frontend
 WORKDIR /app
 
-# Copy all frontend-related files
-COPY package*.json vite.config.* ./
+# Copy package.json, lockfile, vite config and env example
+COPY package*.json vite.config.* .env.example ./
 COPY resources ./resources
 COPY public ./public
 
 RUN npm install
+# ensure Vite sees env vars
+# RUN cp .env.example .env
 RUN npm run build
+
 
 
 # Stage 2: PHP Application
