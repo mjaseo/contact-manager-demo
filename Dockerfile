@@ -1,46 +1,41 @@
-# Stage 1: Build Frontend
+# ---- Build frontend ----
 FROM node:20 AS frontend
 WORKDIR /app
 
-# Copy package.json, lockfile, vite config and env example
-COPY package*.json vite.config.* .env.example ./
-COPY resources ./resources
-COPY public ./public
-
+COPY package*.json vite.config.* ./
 RUN npm install
-# ensure Vite sees env vars
-# RUN cp .env.example .env
+
+COPY resources/ resources/
+COPY public/ public/
+# Copy any Vite entry (like app.jsx / app.js)
+COPY resources/js/ resources/js/
+# create .env just for build to avoid missing env error
+RUN echo "VITE_APP_URL=http://localhost" > .env
+
 RUN npm run build
 
-
-
-# Stage 2: PHP Application
-FROM php:8.3-fpm
+# ---- Backend / Laravel ----
+FROM php:8.3-fpm-bullseye AS backend
 
 # Install system deps
 RUN apt-get update && apt-get install -y \
-    git curl libpng-dev libjpeg-dev libfreetype6-dev libonig-dev libzip-dev unzip zip \
-    && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install pdo pdo_mysql mbstring zip exif pcntl gd bcmath
+    git curl zip unzip libpq-dev libonig-dev libxml2-dev libzip-dev && \
+    docker-php-ext-install pdo pdo_pgsql bcmath && \
+    rm -rf /var/lib/apt/lists/*
 
-# Set working directory
 WORKDIR /var/www/html
 
 # Copy Laravel files
+COPY --from=frontend /app/public/build /var/www/html/public/build
 COPY . .
 
-# Copy frontend build output
-COPY --from=frontend /app/public/build ./public/build
-
-# Install PHP dependencies
-RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+# Install Composer
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 RUN composer install --no-dev --optimize-autoloader
 
-# Set permissions
-RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
+# Generate key and clear caches
+RUN php artisan key:generate --force || true
+RUN php artisan config:clear && php artisan route:clear && php artisan view:clear
 
-# Expose port
 EXPOSE 8000
-
-# Run Laravel server
 CMD php artisan serve --host=0.0.0.0 --port=8000
