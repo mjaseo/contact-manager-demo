@@ -7,9 +7,10 @@ RUN npm install
 
 COPY resources/ resources/
 COPY public/ public/
-# Copy any Vite entry (like app.jsx / app.js)
 COPY resources/js/ resources/js/
-# create .env just for build to avoid missing env error
+
+# Disable Wayfinder type generation
+ENV WAYFINDER_DISABLE=1
 RUN echo "VITE_APP_URL=http://localhost" > .env
 
 RUN npm run build
@@ -17,7 +18,6 @@ RUN npm run build
 # ---- Backend / Laravel ----
 FROM php:8.3-fpm-bullseye AS backend
 
-# Install system deps
 RUN apt-get update && apt-get install -y \
     git curl zip unzip libpq-dev libonig-dev libxml2-dev libzip-dev && \
     docker-php-ext-install pdo pdo_pgsql bcmath && \
@@ -25,9 +25,9 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /var/www/html
 
-# Copy Laravel files
-COPY --from=frontend /app/public/build /var/www/html/public/build
+# Copy Laravel app
 COPY . .
+COPY --from=frontend /app/public/build /var/www/html/public/build
 
 # Install Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
