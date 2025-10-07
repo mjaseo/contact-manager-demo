@@ -38,21 +38,19 @@ RUN php artisan key:generate --force
 RUN npm ci
 
 # Create temporary vite config without wayfinder
-RUN cat > vite.config.ts << 'EOL'
-import { defineConfig } from 'vite';
-import laravel from 'laravel-vite-plugin';
-import Vue from '@vitejs/plugin-vue';
-
-export default defineConfig({
-    plugins: [
-        laravel({
-            input: ['resources/js/app.ts'],
-            refresh: true,
-        }),
-        Vue(),
-    ],
-});
-EOL
+RUN echo 'import { defineConfig } from "vite";' > vite.config.ts && \
+    echo 'import laravel from "laravel-vite-plugin";' >> vite.config.ts && \
+    echo 'import Vue from "@vitejs/plugin-vue";' >> vite.config.ts && \
+    echo '' >> vite.config.ts && \
+    echo 'export default defineConfig({' >> vite.config.ts && \
+    echo '    plugins: [' >> vite.config.ts && \
+    echo '        laravel({' >> vite.config.ts && \
+    echo '            input: ["resources/js/app.ts"],' >> vite.config.ts && \
+    echo '            refresh: true,' >> vite.config.ts && \
+    echo '        }),' >> vite.config.ts && \
+    echo '        Vue(),' >> vite.config.ts && \
+    echo '    ],' >> vite.config.ts && \
+    echo '});' >> vite.config.ts
 
 # Ensure required directories exist and create empty wayfinder file
 RUN mkdir -p resources/js/routes/appearance resources/js/wayfinder && \
