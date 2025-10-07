@@ -1,41 +1,45 @@
-# ---- Build frontend ----
-FROM node:20 AS frontend
+# ------------------------------------------------
+# Stage 1: Build React frontend
+# ------------------------------------------------
+FROM node:18 AS frontend
 WORKDIR /app
-
-COPY package*.json vite.config.* ./
+COPY resources/js ./resources/js
+COPY package*.json ./
 RUN npm install
-
-COPY resources/ resources/
-COPY public/ public/
-COPY resources/js/ resources/js/
-
-# Disable Wayfinder type generation
-ENV WAYFINDER_DISABLE=1
-RUN echo "VITE_APP_URL=http://localhost" > .env
-
 RUN npm run build
 
-# ---- Backend / Laravel ----
-FROM php:8.3-fpm-bullseye AS backend
+# ------------------------------------------------
+# Stage 2: Setup Laravel + PHP
+# ------------------------------------------------
+FROM php:8.2-fpm
 
+# Install dependencies
 RUN apt-get update && apt-get install -y \
-    git curl zip unzip libpq-dev libonig-dev libxml2-dev libzip-dev && \
-    docker-php-ext-install pdo pdo_pgsql bcmath && \
-    rm -rf /var/lib/apt/lists/*
+    git unzip libpq-dev libzip-dev zip curl \
+    && docker-php-ext-install pdo pdo_pgsql zip
 
+# Copy app files
 WORKDIR /var/www/html
-
-# Copy Laravel app
 COPY . .
-COPY --from=frontend /app/public/build /var/www/html/public/build
+
+# Copy built React files from Stage 1
+COPY --from=frontend /app/public/js ./public/js
+COPY --from=frontend /app/public/build ./public/build
 
 # Install Composer
-COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+RUN curl -sS https://getcomposer.org/installer | php && mv composer.phar /usr/local/bin/composer
+
+# Install PHP dependencies
 RUN composer install --no-dev --optimize-autoloader
 
-# Generate key and clear caches
-RUN php artisan key:generate --force || true
-RUN php artisan config:clear && php artisan route:clear && php artisan view:clear
+# Cache Laravel config/routes/views
+RUN php artisan config:cache && php artisan route:cache && php artisan view:cache
 
-EXPOSE 8000
-CMD php artisan serve --host=0.0.0.0 --port=8000
+# Permissions
+RUN chown -R www-data:www-data storage bootstrap/cache
+
+# Expose port
+EXPOSE 8080
+
+# Run Laravel's built-in server
+CMD php artisan serve --host=0.0.0.0 --port=8080
