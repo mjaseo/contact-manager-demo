@@ -31,14 +31,20 @@ RUN cp .env.example .env
 # Install PHP dependencies
 RUN composer install --no-dev --optimize-autoloader
 
+# Generate application key
+RUN php artisan key:generate --force
+
 # Install Node dependencies
 RUN npm ci
 
 # Ensure required directories exist
 RUN mkdir -p resources/js/routes/appearance resources/js/wayfinder
 
+# Generate Wayfinder routes
+RUN php artisan wayfinder:generate
+
 # Build the application
-RUN npm run build
+RUN VITE_APP_NAME="Contact Manager" npm run build
 
 # ---- PHP Stage ----
 FROM base AS php
@@ -48,6 +54,7 @@ WORKDIR /var/www/html
 # Copy application files
 COPY . .
 COPY --from=frontend /app/public/build ./public/build
+COPY --from=frontend /app/resources/js/wayfinder ./resources/js/wayfinder
 COPY --from=composer:latest /usr/bin/composer /usr/local/bin/composer
 
 # Create .env file from example
