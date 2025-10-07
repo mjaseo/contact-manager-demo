@@ -10,26 +10,43 @@ RUN apt-get update && apt-get install -y \
     curl \
     nginx \
     postgresql-client \
-    && docker-php-ext-install pdo pdo_pgsql zip
+    libonig-dev \  # Add this
+    && docker-php-ext-install pdo pdo_pgsql zip mbstring
 
 # ---- Frontend Build Stage ----
 FROM node:22 AS frontend
+# Install PHP dependencies
+RUN apt-get update && apt-get install -y \
+    libpq-dev \
+    libzip-dev \
+    libonig-dev  # Add this
+
 COPY --from=base /usr/local/bin/php /usr/local/bin/php
 COPY --from=base /usr/local/lib /usr/local/lib
+COPY --from=base /usr/lib/x86_64-linux-gnu/libonig.so* /usr/lib/x86_64-linux-gnu/
 WORKDIR /app
 
+# Copy composer and install PHP dependencies first
+COPY --from=composer:latest /usr/bin/composer /usr/local/bin/composer
+COPY composer.* ./
+RUN composer install --no-dev --optimize-autoloader
+
+# Copy package files and install Node dependencies
 COPY package*.json ./
 COPY tsconfig.json ./
 COPY vite.config.ts ./
-COPY composer.json ./
 COPY artisan ./
 
 RUN npm ci
+
+# Copy the rest of the application
 COPY . .
 
+# Ensure required directories exist
 RUN mkdir -p resources/js/routes/appearance && \
     mkdir -p resources/js/wayfinder
 
+# Build the application
 RUN npm run build
 
 # ---- PHP Stage ----
@@ -39,8 +56,11 @@ WORKDIR /var/www/html
 
 COPY . .
 COPY --from=frontend /app/public/build ./public/build
+
+# Install composer
 COPY --from=composer:latest /usr/bin/composer /usr/local/bin/composer
 
+# Install PHP dependencies
 RUN composer install --no-dev --optimize-autoloader \
     && php artisan key:generate --force \
     && chown -R www-data:www-data \
@@ -54,7 +74,7 @@ COPY <<'EOF' /docker-entrypoint.sh
 #!/bin/sh
 set -e
 
-# Wait for database to be ready (assuming PostgreSQL)
+# Wait for database to be ready
 until PGPASSWORD=$DB_PASSWORD psql -h "$DB_HOST" -U "$DB_USERNAME" -d "$DB_DATABASE" -c '\q'; do
   echo "Postgres is unavailable - sleeping"
   sleep 1
