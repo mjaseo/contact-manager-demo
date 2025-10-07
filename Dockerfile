@@ -55,8 +55,14 @@ RUN echo 'import { defineConfig } from "vite";' > vite.config.ts && \
 # Create required directory structure and stub files
 RUN mkdir -p resources/js/actions/App/Http/Controllers/Auth && \
     mkdir -p resources/js/routes/appearance resources/js/wayfinder && \
-    echo "export default {};" > resources/js/actions/App/Http/Controllers/Auth/NewPasswordController.ts && \
-    echo "export const routes = {};" > resources/js/wayfinder/index.ts
+    for controller in NewPasswordController PasswordResetLinkController RegisteredUserController EmailVerificationPromptController EmailVerificationNotificationController VerifyEmailController ConfirmedPasswordStatusController ConfirmablePasswordController AuthenticatedSessionController; do \
+        echo "export default {};" > "resources/js/actions/App/Http/Controllers/Auth/${controller}.ts"; \
+    done && \
+    echo 'export const routes = {};' > resources/js/wayfinder/index.ts && \
+    echo 'export const queryParams = (options?: RouteQueryOptions) => options ?? {};' >> resources/js/wayfinder/index.ts && \
+    echo 'export interface RouteQueryOptions { [key: string]: any };' >> resources/js/wayfinder/index.ts && \
+    echo 'export interface RouteDefinition { name: string; [key: string]: any };' >> resources/js/wayfinder/index.ts && \
+    echo 'export interface RouteFormDefinition { [key: string]: any };' >> resources/js/wayfinder/index.ts
 
 # Build the application
 RUN VITE_APP_NAME="Contact Manager" npm run build
