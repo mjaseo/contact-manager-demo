@@ -37,11 +37,26 @@ RUN php artisan key:generate --force
 # Install Node dependencies
 RUN npm ci
 
-# Ensure required directories exist
-RUN mkdir -p resources/js/routes/appearance resources/js/wayfinder
+# Create temporary vite config without wayfinder
+RUN cat > vite.config.ts << 'EOL'
+import { defineConfig } from 'vite';
+import laravel from 'laravel-vite-plugin';
+import Vue from '@vitejs/plugin-vue';
 
-# Generate Wayfinder routes
-RUN php artisan wayfinder:generate
+export default defineConfig({
+    plugins: [
+        laravel({
+            input: ['resources/js/app.ts'],
+            refresh: true,
+        }),
+        Vue(),
+    ],
+});
+EOL
+
+# Ensure required directories exist and create empty wayfinder file
+RUN mkdir -p resources/js/routes/appearance resources/js/wayfinder && \
+    echo "export const routes = {};" > resources/js/wayfinder/index.ts
 
 # Build the application
 RUN VITE_APP_NAME="Contact Manager" npm run build
@@ -54,7 +69,6 @@ WORKDIR /var/www/html
 # Copy application files
 COPY . .
 COPY --from=frontend /app/public/build ./public/build
-COPY --from=frontend /app/resources/js/wayfinder ./resources/js/wayfinder
 COPY --from=composer:latest /usr/bin/composer /usr/local/bin/composer
 
 # Create .env file from example
@@ -85,6 +99,9 @@ echo "Postgres is up - executing migrations"
 # Run migrations and seeders
 php artisan migrate --force
 php artisan db:seed --force
+
+# Generate wayfinder routes
+php artisan wayfinder:generate || true
 
 # Start services
 php-fpm -D && nginx -g 'daemon off;'
