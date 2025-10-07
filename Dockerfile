@@ -1,10 +1,14 @@
 # ------------------------------------------------
 # Stage 1: Build React frontend
 # ------------------------------------------------
-FROM node:18 AS frontend
+# ---- Frontend Build Stage ----
+FROM node:22 AS frontend
 WORKDIR /app
-COPY resources/js ./resources/js
-COPY package*.json ./
+
+# Copy only the frontend-related files first
+COPY package*.json vite.config.* ./
+COPY resources ./resources
+
 RUN npm install
 RUN npm run build
 

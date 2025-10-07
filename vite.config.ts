@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 import laravel from 'laravel-vite-plugin';
 import vue from '@vitejs/plugin-vue';
-import { wayfinder } from '@laravel/vite-plugin-wayfinder'; // ✅ named import
+// import { wayfinder } from '@laravel/vite-plugin-wayfinder'; // ✅ named import
 
 export default defineConfig({
     plugins: [
@@ -10,7 +10,6 @@ export default defineConfig({
             refresh: true,
         }),
         vue(),
-        // ✅ Disable Wayfinder completely when building in Docker
-        ...(process.env.WAYFINDER_DISABLE ? [] : [wayfinder()]),
+        // ...(process.env.WAYFINDER_DISABLE ? [] : [wayfinder()]),
     ],
 });
