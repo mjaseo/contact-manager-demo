@@ -1,14 +1,24 @@
-
 # ---- Frontend Build Stage ----
 FROM node:22 AS frontend
 WORKDIR /app
 
-# Copy the entire project for proper building
+# Copy package files first for better caching
+COPY package*.json ./
+COPY tsconfig.json ./
+COPY vite.config.ts ./
+
+# Install dependencies
+RUN npm ci
+
+# Copy the rest of the application
 COPY . .
 
-# Install dependencies and build
-RUN npm ci && \
-    npm run build
+# Create empty route files if they don't exist
+RUN mkdir -p resources/js/routes/appearance && \
+    touch resources/js/routes/appearance/index.ts
+
+# Build the application
+RUN npm run build || exit 1
 
 # ---- PHP Stage ----
 FROM php:8.2-fpm
