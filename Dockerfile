@@ -1,29 +1,6 @@
-# ---- Frontend Build Stage ----
-FROM node:22 AS frontend
-WORKDIR /app
 
-# Copy package files first for better caching
-COPY package*.json ./
-COPY tsconfig.json ./
-COPY vite.config.ts ./
-
-# Install dependencies
-RUN npm ci
-
-# Copy the rest of the application
-COPY . .
-
-# Ensure Wayfinder can generate routes
-RUN mkdir -p resources/js/routes/appearance && \
-    mkdir -p resources/js/wayfinder
-
-# Build the application (with proper error handling)
-RUN npm run build
-
-# ---- PHP Stage ----
-FROM php:8.2-fpm
-
-# Install system dependencies
+# ---- Base Stage ----
+FROM php:8.2-fpm AS base
 RUN apt-get update && apt-get install -y \
     git \
     unzip \
@@ -32,37 +9,70 @@ RUN apt-get update && apt-get install -y \
     zip \
     curl \
     nginx \
+    postgresql-client \
     && docker-php-ext-install pdo pdo_pgsql zip
 
-# Configure nginx
-COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
+# ---- Frontend Build Stage ----
+FROM node:22 AS frontend
+COPY --from=base /usr/local/bin/php /usr/local/bin/php
+COPY --from=base /usr/local/lib /usr/local/lib
+WORKDIR /app
 
-# Set working directory
+COPY package*.json ./
+COPY tsconfig.json ./
+COPY vite.config.ts ./
+COPY composer.json ./
+COPY artisan ./
+
+RUN npm ci
+COPY . .
+
+RUN mkdir -p resources/js/routes/appearance && \
+    mkdir -p resources/js/wayfinder
+
+RUN npm run build
+
+# ---- PHP Stage ----
+FROM base AS php
+COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
 WORKDIR /var/www/html
 
-# Copy application files
 COPY . .
 COPY --from=frontend /app/public/build ./public/build
-
-# Install composer
 COPY --from=composer:latest /usr/bin/composer /usr/local/bin/composer
 
-# Install PHP dependencies
-RUN composer install --no-dev --optimize-autoloader
+RUN composer install --no-dev --optimize-autoloader \
+    && php artisan key:generate --force \
+    && chown -R www-data:www-data \
+        storage \
+        bootstrap/cache \
+        public \
+    && php artisan storage:link
 
-# Generate application key if not exists
-RUN php artisan key:generate --force
+# Create an entrypoint script
+COPY <<'EOF' /docker-entrypoint.sh
+#!/bin/sh
+set -e
 
-# Set permissions
-RUN chown -R www-data:www-data \
-    storage \
-    bootstrap/cache \
-    public
+# Wait for database to be ready (assuming PostgreSQL)
+until PGPASSWORD=$DB_PASSWORD psql -h "$DB_HOST" -U "$DB_USERNAME" -d "$DB_DATABASE" -c '\q'; do
+  echo "Postgres is unavailable - sleeping"
+  sleep 1
+done
 
-# Create storage symlink
-RUN php artisan storage:link
+echo "Postgres is up - executing migrations"
+
+# Run migrations and seeders
+php artisan migrate --force
+php artisan db:seed --force
+
+# Start services
+php-fpm -D && nginx -g 'daemon off;'
+EOF
+
+RUN chmod +x /docker-entrypoint.sh
 
 EXPOSE 8080
 
-# Start nginx and php-fpm
-CMD sh -c "php-fpm -D && nginx -g 'daemon off;'"
+# Use the entrypoint script
+ENTRYPOINT ["/docker-entrypoint.sh"]
