@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 import laravel from 'laravel-vite-plugin';
 import Vue from '@vitejs/plugin-vue';
-// import { wayfinder } from '@laravel/vite-plugin-wayfinder'; // ✅ named import
+import { wayfinder } from '@laravel/vite-plugin-wayfinder';
 
 export default defineConfig({
     plugins: [
@@ -10,6 +10,6 @@ export default defineConfig({
             refresh: true,
         }),
         Vue(),
-        // ...(process.env.WAYFINDER_DISABLE ? [] : [wayfinder()]),
+        wayfinder(),
     ],
 });

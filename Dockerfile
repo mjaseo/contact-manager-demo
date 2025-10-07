@@ -13,12 +13,12 @@ RUN npm ci
 # Copy the rest of the application
 COPY . .
 
-# Create empty route files if they don't exist
+# Ensure Wayfinder can generate routes
 RUN mkdir -p resources/js/routes/appearance && \
-    touch resources/js/routes/appearance/index.ts
+    mkdir -p resources/js/wayfinder
 
-# Build the application
-RUN npm run build || exit 1
+# Build the application (with proper error handling)
+RUN npm run build
 
 # ---- PHP Stage ----
 FROM php:8.2-fpm
