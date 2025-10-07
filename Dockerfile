@@ -12,8 +12,8 @@ RUN apt-get update && apt-get install -y \
     postgresql-client \
     libonig-dev \
     nodejs \
-    npm \
-    && docker-php-ext-install pdo pdo_pgsql zip mbstring
+    npm
+RUN docker-php-ext-install pdo pdo_pgsql zip mbstring
 
 # ---- Frontend Build Stage ----
 FROM base AS frontend
@@ -37,8 +37,7 @@ RUN npm ci
 COPY . .
 
 # Ensure required directories exist
-RUN mkdir -p resources/js/routes/appearance && \
-    mkdir -p resources/js/wayfinder
+RUN mkdir -p resources/js/routes/appearance resources/js/wayfinder
 
 # Build the application
 RUN npm run build
@@ -53,13 +52,13 @@ COPY --from=frontend /app/public/build ./public/build
 COPY --from=composer:latest /usr/bin/composer /usr/local/bin/composer
 
 # Install PHP dependencies and setup application
-RUN composer install --no-dev --optimize-autoloader \
-    && php artisan key:generate --force \
-    && chown -R www-data:www-data \
-        storage \
-        bootstrap/cache \
-        public \
-    && php artisan storage:link
+RUN composer install --no-dev --optimize-autoloader
+RUN php artisan key:generate --force
+RUN chown -R www-data:www-data \
+    storage \
+    bootstrap/cache \
+    public
+RUN php artisan storage:link
 
 # Create an entrypoint script
 COPY <<'EOF' /docker-entrypoint.sh
