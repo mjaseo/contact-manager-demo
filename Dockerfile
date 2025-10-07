@@ -52,8 +52,10 @@ RUN echo 'import { defineConfig } from "vite";' > vite.config.ts && \
     echo '    ],' >> vite.config.ts && \
     echo '});' >> vite.config.ts
 
-# Ensure required directories exist and create empty wayfinder file
-RUN mkdir -p resources/js/routes/appearance resources/js/wayfinder && \
+# Create required directory structure and stub files
+RUN mkdir -p resources/js/actions/App/Http/Controllers/Auth && \
+    mkdir -p resources/js/routes/appearance resources/js/wayfinder && \
+    echo "export default {};" > resources/js/actions/App/Http/Controllers/Auth/NewPasswordController.ts && \
     echo "export const routes = {};" > resources/js/wayfinder/index.ts
 
 # Build the application
