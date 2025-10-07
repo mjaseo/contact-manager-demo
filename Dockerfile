@@ -10,33 +10,27 @@ RUN apt-get update && apt-get install -y \
     curl \
     nginx \
     postgresql-client \
-    libonig-dev \  # Add this
+    libonig-dev \
+    nodejs \
+    npm \
     && docker-php-ext-install pdo pdo_pgsql zip mbstring
 
 # ---- Frontend Build Stage ----
-FROM node:22 AS frontend
-# Install PHP dependencies
-RUN apt-get update && apt-get install -y \
-    libpq-dev \
-    libzip-dev \
-    libonig-dev  # Add this
-
-COPY --from=base /usr/local/bin/php /usr/local/bin/php
-COPY --from=base /usr/local/lib /usr/local/lib
-COPY --from=base /usr/lib/x86_64-linux-gnu/libonig.so* /usr/lib/x86_64-linux-gnu/
+FROM base AS frontend
 WORKDIR /app
 
-# Copy composer and install PHP dependencies first
+# Install composer
 COPY --from=composer:latest /usr/bin/composer /usr/local/bin/composer
-COPY composer.* ./
-RUN composer install --no-dev --optimize-autoloader
 
-# Copy package files and install Node dependencies
+# Copy dependency files
+COPY composer.* ./
 COPY package*.json ./
 COPY tsconfig.json ./
 COPY vite.config.ts ./
 COPY artisan ./
 
+# Install dependencies
+RUN composer install --no-dev --optimize-autoloader
 RUN npm ci
 
 # Copy the rest of the application
@@ -56,11 +50,9 @@ WORKDIR /var/www/html
 
 COPY . .
 COPY --from=frontend /app/public/build ./public/build
-
-# Install composer
 COPY --from=composer:latest /usr/bin/composer /usr/local/bin/composer
 
-# Install PHP dependencies
+# Install PHP dependencies and setup application
 RUN composer install --no-dev --optimize-autoloader \
     && php artisan key:generate --force \
     && chown -R www-data:www-data \
