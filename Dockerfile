@@ -19,22 +19,20 @@ RUN docker-php-ext-install pdo pdo_pgsql zip mbstring
 FROM base AS frontend
 WORKDIR /app
 
+# Copy the entire application first
+COPY . .
+
 # Install composer
 COPY --from=composer:latest /usr/bin/composer /usr/local/bin/composer
 
-# Copy dependency files
-COPY composer.* ./
-COPY package*.json ./
-COPY tsconfig.json ./
-COPY vite.config.ts ./
-COPY artisan ./
+# Create .env file from example
+RUN cp .env.example .env
 
-# Install dependencies
+# Install PHP dependencies
 RUN composer install --no-dev --optimize-autoloader
-RUN npm ci
 
-# Copy the rest of the application
-COPY . .
+# Install Node dependencies
+RUN npm ci
 
 # Ensure required directories exist
 RUN mkdir -p resources/js/routes/appearance resources/js/wayfinder
@@ -47,18 +45,22 @@ FROM base AS php
 COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
 WORKDIR /var/www/html
 
+# Copy application files
 COPY . .
 COPY --from=frontend /app/public/build ./public/build
 COPY --from=composer:latest /usr/bin/composer /usr/local/bin/composer
 
-# Install PHP dependencies and setup application
-RUN composer install --no-dev --optimize-autoloader
-RUN php artisan key:generate --force
-RUN chown -R www-data:www-data \
-    storage \
-    bootstrap/cache \
-    public
-RUN php artisan storage:link
+# Create .env file from example
+RUN cp .env.example .env
+
+# Install dependencies and setup application
+RUN composer install --no-dev --optimize-autoloader && \
+    php artisan key:generate --force && \
+    chown -R www-data:www-data \
+        storage \
+        bootstrap/cache \
+        public && \
+    php artisan storage:link
 
 # Create an entrypoint script
 COPY <<'EOF' /docker-entrypoint.sh
