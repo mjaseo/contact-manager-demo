@@ -57,12 +57,44 @@ RUN mkdir -p resources/js/actions/App/Http/Controllers/Auth && \
     mkdir -p resources/js/routes/appearance resources/js/wayfinder && \
     for controller in NewPasswordController PasswordResetLinkController RegisteredUserController EmailVerificationPromptController EmailVerificationNotificationController VerifyEmailController ConfirmedPasswordStatusController ConfirmablePasswordController AuthenticatedSessionController; do \
         echo "export default {};" > "resources/js/actions/App/Http/Controllers/Auth/${controller}.ts"; \
-    done && \
-    echo 'export const routes = {};' > resources/js/wayfinder/index.ts && \
-    echo 'export const queryParams = (options?: RouteQueryOptions) => options ?? {};' >> resources/js/wayfinder/index.ts && \
-    echo 'export interface RouteQueryOptions { [key: string]: any };' >> resources/js/wayfinder/index.ts && \
-    echo 'export interface RouteDefinition { name: string; [key: string]: any };' >> resources/js/wayfinder/index.ts && \
-    echo 'export interface RouteFormDefinition { [key: string]: any };' >> resources/js/wayfinder/index.ts
+    done
+
+# Create wayfinder types and utilities
+RUN cat > resources/js/wayfinder/types.ts << 'EOL'
+export interface RouteQueryOptions {
+    [key: string]: any;
+}
+
+export interface RouteDefinition {
+    name: string;
+    [key: string]: any;
+}
+
+export interface RouteFormDefinition {
+    [key: string]: any;
+}
+
+export const urlDefaults: Record<string, unknown> = {};
+
+export const queryParams = (options?: RouteQueryOptions): RouteQueryOptions => options ?? {};
+
+export const applyUrlDefaults = <T extends Record<string, unknown> | undefined>(
+    existing: T,
+): T => {
+    const existingParams = { ...(existing ?? ({} as Record<string, unknown>)) };
+
+    for (const key in urlDefaults) {
+        if (existingParams[key] === undefined && urlDefaults[key] !== undefined) {
+            (existingParams as Record<string, unknown>)[key] = urlDefaults[key];
+        }
+    }
+
+    return existingParams as T;
+};
+EOL
+
+# Create index.ts that re-exports everything
+RUN echo "export * from './types';" > resources/js/wayfinder/index.ts
 
 # Build the application
 RUN VITE_APP_NAME="Contact Manager" npm run build
