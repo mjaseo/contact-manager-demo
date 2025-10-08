@@ -83,13 +83,13 @@ RUN VITE_APP_NAME="Contact Manager" npm run build
 
 # ---- PHP Stage ----
 FROM base AS php
-COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
 WORKDIR /var/www/html
 
 # Copy application files
 COPY . .
 COPY --from=frontend /app/public/build ./public/build
 COPY --from=composer:latest /usr/bin/composer /usr/local/bin/composer
+COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
 
 # Create .env file from example
 RUN cp .env.example .env
@@ -101,7 +101,8 @@ RUN composer install --no-dev --optimize-autoloader && \
         storage \
         bootstrap/cache \
         public && \
-    php artisan storage:link
+    php artisan storage:link && \
+    rm -f /etc/nginx/sites-enabled/default
 
 # Create an entrypoint script
 COPY <<'EOF' /docker-entrypoint.sh
@@ -123,6 +124,14 @@ php artisan db:seed --force
 # Generate wayfinder routes
 php artisan wayfinder:generate || true
 
+# Clear and cache routes and config
+php artisan route:clear
+php artisan route:cache
+php artisan config:clear
+php artisan config:cache
+php artisan view:clear
+php artisan view:cache
+
 # Start services
 php-fpm -D && nginx -g 'daemon off;'
 EOF
@@ -133,3 +142,4 @@ EXPOSE 8080
 
 # Use the entrypoint script
 ENTRYPOINT ["/docker-entrypoint.sh"]
+
