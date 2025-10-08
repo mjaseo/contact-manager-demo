@@ -124,13 +124,10 @@ php artisan db:seed --force
 # Generate wayfinder routes
 php artisan wayfinder:generate || true
 
-# Clear and cache routes and config
+# Clear caches without regenerating them
 php artisan route:clear
-php artisan route:cache
 php artisan config:clear
-php artisan config:cache
 php artisan view:clear
-php artisan view:cache
 
 # Start services
 php-fpm -D && nginx -g 'daemon off;'
@@ -142,4 +139,3 @@ EXPOSE 8080
 
 # Use the entrypoint script
 ENTRYPOINT ["/docker-entrypoint.sh"]
-
