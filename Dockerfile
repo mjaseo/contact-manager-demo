@@ -1,4 +1,3 @@
-
 # ---- Base Stage ----
 FROM php:8.2-fpm AS base
 RUN apt-get update && apt-get install -y \
@@ -59,39 +58,22 @@ RUN mkdir -p resources/js/actions/App/Http/Controllers/Auth && \
         echo "export default {};" > "resources/js/actions/App/Http/Controllers/Auth/${controller}.ts"; \
     done
 
-# Create wayfinder types and utilities
-RUN cat > resources/js/wayfinder/types.ts << 'EOL'
-export interface RouteQueryOptions {
-    [key: string]: any;
-}
-
-export interface RouteDefinition {
-    name: string;
-    [key: string]: any;
-}
-
-export interface RouteFormDefinition {
-    [key: string]: any;
-}
-
-export const urlDefaults: Record<string, unknown> = {};
-
-export const queryParams = (options?: RouteQueryOptions): RouteQueryOptions => options ?? {};
-
-export const applyUrlDefaults = <T extends Record<string, unknown> | undefined>(
-    existing: T,
-): T => {
-    const existingParams = { ...(existing ?? ({} as Record<string, unknown>)) };
-
-    for (const key in urlDefaults) {
-        if (existingParams[key] === undefined && urlDefaults[key] !== undefined) {
-            (existingParams as Record<string, unknown>)[key] = urlDefaults[key];
-        }
-    }
-
-    return existingParams as T;
-};
-EOL
+# Create wayfinder types
+RUN echo 'export type QueryParams = Record<string, string>;' > resources/js/wayfinder/types.ts && \
+    echo 'export type RouteQueryOptions = { query?: QueryParams; mergeQuery?: QueryParams; };' >> resources/js/wayfinder/types.ts && \
+    echo 'export interface RouteDefinition { name: string; [key: string]: any; }' >> resources/js/wayfinder/types.ts && \
+    echo 'export interface RouteFormDefinition { [key: string]: any; }' >> resources/js/wayfinder/types.ts && \
+    echo 'export const urlDefaults: Record<string, unknown> = {};' >> resources/js/wayfinder/types.ts && \
+    echo 'export const queryParams = (options?: RouteQueryOptions): RouteQueryOptions => options ?? {};' >> resources/js/wayfinder/types.ts && \
+    echo 'export const applyUrlDefaults = <T extends Record<string, unknown> | undefined>(existing: T): T => {' >> resources/js/wayfinder/types.ts && \
+    echo '    const existingParams = { ...(existing ?? ({} as Record<string, unknown>)) };' >> resources/js/wayfinder/types.ts && \
+    echo '    for (const key in urlDefaults) {' >> resources/js/wayfinder/types.ts && \
+    echo '        if (existingParams[key] === undefined && urlDefaults[key] !== undefined) {' >> resources/js/wayfinder/types.ts && \
+    echo '            (existingParams as Record<string, unknown>)[key] = urlDefaults[key];' >> resources/js/wayfinder/types.ts && \
+    echo '        }' >> resources/js/wayfinder/types.ts && \
+    echo '    }' >> resources/js/wayfinder/types.ts && \
+    echo '    return existingParams as T;' >> resources/js/wayfinder/types.ts && \
+    echo '};' >> resources/js/wayfinder/types.ts
 
 # Create index.ts that re-exports everything
 RUN echo "export * from './types';" > resources/js/wayfinder/index.ts
